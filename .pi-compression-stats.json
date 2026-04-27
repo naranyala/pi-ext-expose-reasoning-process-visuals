@@ -1,0 +1,29 @@
+{
+  "metrics": {
+    "totalSessions": 5,
+    "totalOriginalTokens": 0,
+    "totalCompressedTokens": 0,
+    "totalSavings": 0,
+    "averageCompressionRatio": 0,
+    "compressionHistory": []
+  },
+  "config": {
+    "enabled": true,
+    "strategies": [
+      "semantic",
+      "whitespace",
+      "code",
+      "format"
+    ],
+    "targetRatio": 0.7,
+    "aggressiveness": "medium",
+    "preserveMeaning": true,
+    "thirdPartyServices": [
+      "anthropic"
+    ]
+  },
+  "cache": {
+    "cache": [],
+    "globalPatterns": []
+  }
+}
