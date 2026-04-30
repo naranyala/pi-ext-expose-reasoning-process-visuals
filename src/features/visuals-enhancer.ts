@@ -2,7 +2,7 @@ import { Feature } from "../core/feature";
 import { isEditToolResult, type ToolResultEvent, type ExtensionContext, type ToolCallEvent } from "@mariozechner/pi-coding-agent";
 import { makeDiffConcise } from "../shared/diff-utils";
 import { beautifyError } from "../shared/error-utils";
-import { truncate } from "../shared/utils";
+import { maskSensitiveData } from "../shared/utils";
 
 /**
  * Reasoning tiers for providing varied visual feedback based on thinking length.
@@ -84,7 +84,7 @@ export class VisualsEnhancerFeature extends Feature {
       ctx.ui.setWidget("last-diff-full", [
         `File: ${this.lastFullDiff.path}`,
         "-----------------------------------",
-        this.lastFullDiff.diff,
+        maskSensitiveData(this.lastFullDiff.diff),
         "-----------------------------------",
         "(Run /visuals to return to concise mode)"
       ]);
@@ -107,6 +107,7 @@ export class VisualsEnhancerFeature extends Feature {
       if (input?.path) this.workingSet.add(input.path);
       this.currentToolCallDescription = this.getToolCallDescription(event);
       this.lastToolStatus = "idle";
+      this.turnToolCount++;
       this.updateAgentWidgets(ctx);
     });
 
@@ -115,7 +116,6 @@ export class VisualsEnhancerFeature extends Feature {
       this.currentToolCallDescription = null;
       this.lastToolStatus = event.isError ? "error" : "success";
       this.updateAgentWidgets(ctx);
-      this.turnToolCount++;
       if (event.isError) {
         if (this.diffMode === DiffMode.Concise) {
           this.diffMode = DiffMode.Full;
@@ -188,11 +188,11 @@ export class VisualsEnhancerFeature extends Feature {
   private detectConfidence(text: string): "High" | "Medium" | "Low" {
     if (!text) return "Medium";
     const markers = {
-      High: /certainly|definitely|clearly|confident|sure/i,
+      High: /certainly|definitely|clearly|confident|(?<!not\s)sure/i,
       Low: /not sure|maybe|possibly|might be|i think|let me double check/i,
     };
-    if (markers.High.test(text)) return "High";
     if (markers.Low.test(text)) return "Low";
+    if (markers.High.test(text)) return "High";
     return "Medium";
   }
 
@@ -211,21 +211,20 @@ export class VisualsEnhancerFeature extends Feature {
 
   private extractSummary(text: string): string | null {
     if (!text) return null;
-    const patterns = [/Goal:\s*(.*)/i, /Plan:\s*(.*)/i, /I will\s*(.*)/i, /Objective:\s*(.*)/i];
+    const patterns = [/Goal:\s*([\s\S]*?)(?=\n\n|\n[A-Z][a-z]+:|$)/i, /Plan:\s*([\s\S]*?)(?=\n\n|\n[A-Z][a-z]+:|$)/i, /I will\s*([\s\S]*?)(?=\n\n|\n[A-Z][a-z]+:|$)/i, /Objective:\s*([\s\S]*?)(?=\n\n|\n[A-Z][a-z]+:|$)/i];
     for (const pattern of patterns) {
       const match = text.match(pattern);
       if (match && match[1]) {
-        const summary = match[1].split("\n")[0].trim();
-        if (summary.length > 5 && summary.length < 100) return summary;
+        return match[1].trim();
       }
     }
-    const lines = text.split("\n").map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length > 0 && lines[0].length < 100) return lines[0];
+    const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0);
+    if (paragraphs.length > 0) return paragraphs[0];
     return null;
   }
 
   private updateGoalStack(text: string) {
-    const patterns = [/(?:Step \d+:)\s*(.*)/gi, /(\d\.\s.*)/gi, /(?:First,|Then,|Finally,)\s*(.*)/gi];
+    const patterns = [/(?:Step \d+:)\s*([\s\S]*?)(?=\n\n|\nStep \d+:|$)/gi, /(\d\.\s[\s\S]*?)(?=\n\n|\n\d\.\s|$)/gi, /(?:First,|Then,|Finally,)\s*([\s\S]*?)(?=\n\n|\n(?:First,|Then,|Finally,)|$)/gi];
     let found = false;
     for (const pattern of patterns) {
       const matches = [...text.matchAll(pattern)];
@@ -244,15 +243,6 @@ export class VisualsEnhancerFeature extends Feature {
     if (matches) matches.forEach(m => { if (m.length > 3) this.conceptSet.add(m); });
   }
 
-  private calculateTrajectory(): "Converging" | "Diverging" | "Stable" {
-    if (this.thinkingHistory.length < 2) return "Stable";
-    const recent = this.lastThinkingLength;
-    const average = this.thinkingHistory.reduce((a, b) => a + b, 0) / this.thinkingHistory.length;
-    if (recent < average * 0.7) return "Converging";
-    if (recent > average * 1.3) return "Diverging";
-    return "Stable";
-  }
-
   private updateAgentWidgets(ctx: ExtensionContext) {
     if (this.currentTier === ReasoningTier.None) {
       ctx.ui.setWidget("agent-status", []);
@@ -263,57 +253,61 @@ export class VisualsEnhancerFeature extends Feature {
     }
     const phaseTransition = this.previousPhase && this.previousPhase !== this.currentPhase ? `${this.previousPhase} -> ${this.currentPhase}` : this.currentPhase;
     ctx.ui.setWidget("agent-state", [`Phase: ${phaseTransition} | Confidence: ${this.currentConfidence}`]);
-    const currentStep = this.goalStack[0] || this.currentSummary || "No active step";
-    const nextStep = this.goalStack[1] || "None";
-    ctx.ui.setWidget("agent-hierarchy", [`Focus: ${truncate(currentStep, 40)} > Next: ${truncate(nextStep, 40)}`]);
-    ctx.ui.setWidget("agent-trajectory", [`Trajectory: ${this.calculateTrajectory()}`]);
+    
+    const currentFocus = this.currentSummary || this.goalStack[0] || "No active step";
+    const nextFocus = this.currentSummary ? (this.goalStack[0] || "None") : (this.goalStack[1] || "None");
+    
+    const focusLines = currentFocus.split('\n').map((line, i) => i === 0 ? `Focus: ${line}` : `  ${line}`);
+    const nextLines = nextFocus.split('\n').map((line, i) => i === 0 ? `Next: ${line}` : `  ${line}`);
+    
+    ctx.ui.setWidget("agent-focus", [...focusLines, "", ...nextLines]);
+    ctx.ui.setWidget("agent-next", []);
     if (this.conceptSet.size > 0) {
       const concepts = Array.from(this.conceptSet).slice(0, 4).join(', ');
-      ctx.ui.setWidget("agent-concepts", [`Concepts: ${truncate(concepts, 70)}`]);
+      ctx.ui.setWidget("agent-concepts", [`Concepts: ${concepts}`]);
     } else {
       ctx.ui.setWidget("agent-concepts", []);
     }
     if (this.workingSet.size > 0) {
       const files = Array.from(this.workingSet).map(f => f.split('/').pop()).join(', ');
-      ctx.ui.setWidget("agent-context", [`Context: ${truncate(files, 70)}`]);
+      ctx.ui.setWidget("agent-context", [`Context: ${files}`]);
     } else {
       ctx.ui.setWidget("agent-context", []);
     }
-    const stats = `Complexity: ${this.currentComplexity} | Turns: ${this.totalTurnCount} | Tools: ${this.turnToolCount}`;
+    const stats = `Complexity: ${this.currentComplexity} | Turns: ${this.totalTurnCount}`;
     ctx.ui.setWidget("agent-stats", [stats]);
     if (this.currentToolExtension || this.currentToolCallDescription) {
       const ext = this.currentToolExtension ? `[${this.currentToolExtension}]` : "";
       const desc = this.currentToolCallDescription ? ` ${this.currentToolCallDescription}` : "";
-      ctx.ui.setWidget("agent-tool", [`Tool: ${ext}${truncate(desc, 70)}`]);
+      ctx.ui.setWidget("agent-tool", [`Tool: ${ext}${desc}`]);
     } else {
       ctx.ui.setWidget("agent-tool", []);
-    }
-    if (this.lastToolStatus !== "idle") {
-      const resultMsg = this.lastToolStatus === "success" ? "Last tool: Success" : "Last tool: Error";
-      ctx.ui.setWidget("agent-result", [resultMsg]);
-    } else {
-      ctx.ui.setWidget("agent-result", []);
     }
   }
 
   private getToolCallDescription(event: ToolCallEvent): string {
     const toolName = event.toolName;
     const input = event.input as any;
+    let description = "";
     switch (toolName) {
-      case "bash": return `run: ${input.command?.substring(0, 60)}${input.command?.length > 60 ? "..." : ""}`;
-      case "read": return `read: ${input.path}`;
-      case "edit": return `edit: ${input.path}`;
-      case "write": return `write: ${input.path}`;
-      case "grep": return `grep: ${input.pattern} in ${input.path}`;
-      case "find": return `find: ${input.pattern}`;
-      case "ls": return `ls: ${input.path}`;
+      case "bash": description = `run: ${input.command}`; break;
+      case "read": description = `read: ${input.path}`; break;
+      case "edit": description = `edit: ${input.path}`; break;
+      case "write": description = `write: ${input.path}`; break;
+      case "grep": description = `grep: ${input.pattern} in ${input.path}`; break;
+      case "find": description = `find: ${input.pattern}`; break;
+      case "ls": description = `ls: ${input.path}`; break;
       default:
         try {
-          const json = JSON.stringify(input);
-          return json.length > 60 ? json.substring(0, 60) + "..." : json;
+          if (typeof input === 'object' && input !== null) {
+            description = JSON.stringify(input);
+          } else {
+            description = String(input);
+          }
         } catch {
-          return "unknown call";
+          description = "unknown call";
         }
     }
+    return maskSensitiveData(description);
   }
 }

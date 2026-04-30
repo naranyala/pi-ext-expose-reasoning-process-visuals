@@ -17,22 +17,16 @@ Pi-Mono eliminates the need to scroll through massive logs to understand why an 
 Pi-Mono doesn't just show that the agent is "thinking"; it analyzes *how* it is thinking across several cognitive layers:
 
 ### 1. Intent & Goal Hierarchy
-- **Sequential Tracking**: Extracts multi-step plans (e.g., "First I'll read X, then I'll edit Y") and displays them as a focus hierarchy.
-- **Focus vs. Next**: See exactly what the agent is focusing on right now and what it intends to do next.
+- **Dynamic Focus**: See exactly what the agent is focusing on right now and what it intends to do next. Pi-Mono now exposes complete paragraphs of intent, ensuring no critical detail is lost to trimming.
 
-### 2. Cognitive Trajectory
-- **Converging**: Thinking is becoming more focused $\rightarrow$ Solution is near.
-- **Diverging**: Thinking is expanding $\rightarrow$ Agent is exploring new complexities or potentially "rabbit-holing."
-- **Stable**: Consistent reasoning effort.
-
-### 3. Semantic Phase Detection
+### 2. Semantic Phase Detection
 Real-time categorization of the agent's current activity:
 - **Analysis**: Investigating the codebase and searching for patterns.
 - **Planning**: Designing the solution and outlining steps.
 - **Coding**: Actively implementing changes.
 - **Verification**: Running tests and validating the fix.
 
-### 4. Confidence & Health
+### 3. Confidence & Health
 - **Confidence Scoring**: Detects linguistic markers to expose the agent's certainty (**High** | **Medium** | **Low**).
 - **Stuck Detection**: Automatically flags when the agent is looping or confused (e.g., "wait, let me rethink...").
 
@@ -49,6 +43,7 @@ Tired of scrolling through hundreds of lines of unchanged code?
 ### 📂 Contextual Awareness
 - **Working Set Tracking**: Maintains a real-time list of all files the agent is currently manipulating.
 - **Concept Extraction**: Identifies and exposes the key technical entities (Classes, Modules, Functions) the agent is conceptually focusing on.
+- **Privacy First**: Automatically masks sensitive data (API keys, tokens, secrets) in tool calls and diffs to prevent accidental exposure in the TUI.
 
 ---
 
@@ -60,13 +55,11 @@ Pi-Mono populates your interface with a suite of one-liner widgets:
 | :--- | :--- | :--- |
 | `agent-status` | Reasoning tier & health | `Reasoning...` or `Stuck: Agent is looping...` |
 | `agent-state` | Phase & Confidence | `Phase: Analysis -> Planning \| Confidence: High` |
-| `agent-hierarchy` | Goal sequence | `Focus: Fix auth bug > Next: Run tests` |
-| `agent-trajectory` | Reasoning trend | `Trajectory: Converging` |
+| `agent-focus` | Current & Next focus | `Focus: Fix auth bug \n\n Next: Run tests` |
 | `agent-concepts` | Conceptual focus | `Concepts: AuthProvider, SessionToken` |
 | `agent-context` | Active files | `Context: auth.ts, user-service.ts` |
-| `agent-stats` | Turn & tool metrics | `Complexity: Medium \| Turns: 5 \| Tools: 2` |
+| `agent-stats` | Turn & complexity metrics | `Complexity: Medium \| Turns: 5` |
 | `agent-tool` | Active tool call | `Tool: [core] read: src/index.ts` |
-| `agent-result` | Last tool outcome | `Last tool: Success` |
 
 ---
 
@@ -96,4 +89,3 @@ Built for performance and extensibility:
 ## 📄 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
-
