@@ -1,8 +1,8 @@
-# 🌌 Pi-Mono: Cognitive Visuals Enhancer
+# 🌌 Cognitive Visuals Enhancer for `pi-mono`
 
 ![demo-01](./demo-01.png)
 
-**Pi-Mono** is a high-fidelity transparency layer for the Pi Coding Agent. It transforms the AI's "black box" reasoning process into a structured, real-time cognitive stream, reducing visual noise and providing deep insights into the agent's mental trajectory—all within your TUI.
+This **Pi-Mono** extension is a high-fidelity transparency layer for the Pi Coding Agent. It transforms the AI's "black box" reasoning process into a structured, real-time cognitive stream, reducing visual noise and providing deep insights into the agent's mental trajectory—all within your TUI.
 
 ---
 
@@ -10,16 +10,16 @@
 
 When working with powerful AI agents, the most critical information isn't just the final code—it's the **intent**, the **confidence**, and the **trajectory** of the reasoning.
 
-Pi-Mono eliminates the need to scroll through massive logs to understand why an agent is doing something. Instead, it exposes the agent's internal state through a series of concise, non-intrusive widgets.
+The extension eliminates the need to scroll through massive logs to understand why an agent is doing something. Instead, it exposes the agent's internal state through a series of concise, non-intrusive widgets.
 
 ---
 
 ## 🧠 Deep-State Visibility
 
-Pi-Mono doesn't just show that the agent is "thinking"; it analyzes *how* it is thinking across several cognitive layers:
+The Extension doesn't just show that the agent is "thinking"; it analyzes *how* it is thinking across several cognitive layers:
 
 ### 1. Intent & Goal Hierarchy
-- **Dynamic Focus**: See exactly what the agent is focusing on right now and what it intends to do next. Pi-Mono now exposes complete paragraphs of intent, ensuring no critical detail is lost to trimming.
+- **Dynamic Focus**: See exactly what the agent is focusing on right now and what it intends to do next, exposes complete paragraphs of intent, ensuring no critical detail is lost to trimming.
 
 ### 2. Semantic Phase Detection
 Real-time categorization of the agent's current activity:
@@ -51,7 +51,7 @@ Tired of scrolling through hundreds of lines of unchanged code?
 
 ## 🎨 The TUI Experience
 
-Pi-Mono populates your interface with a suite of one-liner widgets:
+This extension populates your interface with a suite of one-liner widgets:
 
 | Widget | Purpose | Example |
 | :--- | :--- | :--- |
