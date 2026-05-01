@@ -1,5 +1,7 @@
 # 🌌 Pi-Mono: Cognitive Visuals Enhancer
 
+![demo-01](./demo-01.png)
+
 **Pi-Mono** is a high-fidelity transparency layer for the Pi Coding Agent. It transforms the AI's "black box" reasoning process into a structured, real-time cognitive stream, reducing visual noise and providing deep insights into the agent's mental trajectory—all within your TUI.
 
 ---
