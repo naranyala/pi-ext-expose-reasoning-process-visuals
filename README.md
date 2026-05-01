@@ -2,6 +2,8 @@
 
 ![demo-01](./demo-01.png)
 
+![demo-01](./demo-02.png)
+
 This **Pi-Mono** extension is a high-fidelity transparency layer for the Pi Coding Agent. It transforms the AI's "black box" reasoning process into a structured, real-time cognitive stream, reducing visual noise and providing deep insights into the agent's mental trajectory—all within your TUI.
 
 ---
