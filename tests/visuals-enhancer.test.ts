@@ -224,4 +224,183 @@ This is the second paragraph.
       expect(statsWidgetCall[1][0]).toContain("Complexity: Low");
     });
   });
+
+  describe("Complex Task Format Extraction", () => {
+    test("should extract tasks from Plan header with numbered items", async () => {
+      const handler = handlers["message_update"];
+      const thinkingText = `
+Goal: Fix authentication bug
+
+Plan:
+1. Update middleware.ts
+2. Update session.ts
+3. Verify with tests
+      `;
+      
+      await handler({ 
+        message: { role: "assistant", content: [{ type: "thinking", thinking: thinkingText }] }
+      }, mockCtx);
+
+      const focusWidgetCall = mockCtx.ui.setWidget.mock.calls.find((c: any) => c[0] === "agent-focus");
+      expect(focusWidgetCall).toBeDefined();
+      const lines = focusWidgetCall[1];
+      
+      expect(lines[0]).toBe("Focus: Fix authentication bug");
+      expect(lines.some(l => l === "Next: 1. Update middleware.ts")).toBe(true);
+    });
+
+    test("should extract tasks from Goals header", async () => {
+      const handler = handlers["message_update"];
+      const thinkingText = `
+Objective: Improve performance
+
+Goals:
+1. Optimize database queries
+2. Add caching layer
+3. Reduce bundle size
+      `;
+      
+      await handler({ 
+        message: { role: "assistant", content: [{ type: "thinking", thinking: thinkingText }] }
+      }, mockCtx);
+
+      const focusWidgetCall = mockCtx.ui.setWidget.mock.calls.find((c: any) => c[0] === "agent-focus");
+      expect(focusWidgetCall).toBeDefined();
+      expect(focusWidgetCall[1][0]).toBe("Focus: Improve performance");
+      expect(focusWidgetCall[1].some(l => l === "Next: 1. Optimize database queries")).toBe(true);
+    });
+
+    test("should extract tasks from bullet point lists", async () => {
+      const handler = handlers["message_update"];
+      const thinkingText = `
+Goal: Refactor the codebase
+
+- Update error handling
+- Add logging
+- Improve documentation
+      `;
+      
+      await handler({ 
+        message: { role: "assistant", content: [{ type: "thinking", thinking: thinkingText }] }
+      }, mockCtx);
+
+      const focusWidgetCall = mockCtx.ui.setWidget.mock.calls.find((c: any) => c[0] === "agent-focus");
+      expect(focusWidgetCall).toBeDefined();
+      expect(focusWidgetCall[1][0]).toBe("Focus: Refactor the codebase");
+      expect(focusWidgetCall[1].some(l => l.includes("Update error handling"))).toBe(true);
+    });
+
+    test("should extract tasks from keyword lists", async () => {
+      const handler = handlers["message_update"];
+      const thinkingText = `
+Goal: Deployment process
+
+First, build the project
+Then, run tests
+Finally, deploy to production
+      `;
+      
+      await handler({ 
+        message: { role: "assistant", content: [{ type: "thinking", thinking: thinkingText }] }
+      }, mockCtx);
+
+      const focusWidgetCall = mockCtx.ui.setWidget.mock.calls.find((c: any) => c[0] === "agent-focus");
+      expect(focusWidgetCall).toBeDefined();
+      expect(focusWidgetCall[1][0]).toBe("Focus: Deployment process");
+      expect(focusWidgetCall[1].some(l => l.includes("build the project"))).toBe(true);
+    });
+
+    test("should extract multi-line goal content", async () => {
+      const handler = handlers["message_update"];
+      const thinkingText = `Goal: Implement OAuth2 authentication
+which requires updating the middleware
+and the session provider`;
+      
+      await handler({ 
+        message: { role: "assistant", content: [{ type: "thinking", thinking: thinkingText }] }
+      }, mockCtx);
+
+      const focusWidgetCall = mockCtx.ui.setWidget.mock.calls.find((c: any) => c[0] === "agent-focus");
+      expect(focusWidgetCall).toBeDefined();
+      const lines = focusWidgetCall[1];
+      
+      expect(lines[0]).toBe("Focus: Implement OAuth2 authentication");
+      expect(lines[1].trim()).toBe("which requires updating the middleware");
+      expect(lines[2].trim()).toBe("and the session provider");
+    });
+
+    test("should extract from Steps header", async () => {
+      const handler = handlers["message_update"];
+      const thinkingText = `
+Goal: Complete feature
+
+Steps:
+1. Write unit tests
+2. Implement feature
+3. Run integration tests
+      `;
+      
+      await handler({ 
+        message: { role: "assistant", content: [{ type: "thinking", thinking: thinkingText }] }
+      }, mockCtx);
+
+      const focusWidgetCall = mockCtx.ui.setWidget.mock.calls.find((c: any) => c[0] === "agent-focus");
+      expect(focusWidgetCall).toBeDefined();
+      expect(focusWidgetCall[1].some(l => l.includes("Write unit tests"))).toBe(true);
+    });
+
+    test("should handle Task header", async () => {
+      const handler = handlers["message_update"];
+      const thinkingText = `
+Task: Fix critical bug
+
+1. Reproduce the issue
+2. Find root cause
+3. Apply fix
+      `;
+      
+      await handler({ 
+        message: { role: "assistant", content: [{ type: "thinking", thinking: thinkingText }] }
+      }, mockCtx);
+
+      const focusWidgetCall = mockCtx.ui.setWidget.mock.calls.find((c: any) => c[0] === "agent-focus");
+      expect(focusWidgetCall).toBeDefined();
+      expect(focusWidgetCall[1][0]).toBe("Focus: Fix critical bug");
+      expect(focusWidgetCall[1].some(l => l.includes("Reproduce the issue"))).toBe(true);
+    });
+
+    test("should handle Current goal header", async () => {
+      const handler = handlers["message_update"];
+      const thinkingText = `
+Current goal: Update dependencies
+
+1. Check for outdated packages
+2. Update package.json
+3. Run npm install
+      `;
+      
+      await handler({ 
+        message: { role: "assistant", content: [{ type: "thinking", thinking: thinkingText }] }
+      }, mockCtx);
+
+      const focusWidgetCall = mockCtx.ui.setWidget.mock.calls.find((c: any) => c[0] === "agent-focus");
+      expect(focusWidgetCall).toBeDefined();
+      expect(focusWidgetCall[1][0]).toBe("Focus: Update dependencies");
+    });
+
+    test("should fallback to first paragraph when no explicit goal found", async () => {
+      const handler = handlers["message_update"];
+      const thinkingText = `
+This is some thinking about the problem.
+It has multiple lines of analysis.
+      `;
+      
+      await handler({ 
+        message: { role: "assistant", content: [{ type: "thinking", thinking: thinkingText }] }
+      }, mockCtx);
+
+      const focusWidgetCall = mockCtx.ui.setWidget.mock.calls.find((c: any) => c[0] === "agent-focus");
+      expect(focusWidgetCall[1][0]).toBe("Focus: This is some thinking about the problem.");
+    });
+  });
 });

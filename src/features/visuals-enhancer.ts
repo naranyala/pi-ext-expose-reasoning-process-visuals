@@ -157,7 +157,8 @@ export class VisualsEnhancerFeature extends Feature {
       this.extractConcepts(text);
       this.thinkingHistory.push(length);
       if (this.thinkingHistory.length > 5) this.thinkingHistory.shift();
-      if (tier !== this.currentTier || complexity !== this.currentComplexity || summary !== this.currentSummary || analysis.isStuck !== this.currentAnalysisStuck || phase !== this.currentPhase || confidence !== this.currentConfidence) {
+      const needsUpdate = tier !== this.currentTier || this.currentTier === ReasoningTier.None;
+      if (needsUpdate || complexity !== this.currentComplexity || summary !== this.currentSummary || analysis.isStuck !== this.currentAnalysisStuck || phase !== this.currentPhase || confidence !== this.currentConfidence) {
         this.previousPhase = this.currentPhase;
         this.currentTier = tier;
         this.currentComplexity = complexity;
@@ -211,30 +212,146 @@ export class VisualsEnhancerFeature extends Feature {
 
   private extractSummary(text: string): string | null {
     if (!text) return null;
-    const patterns = [/Goal:\s*([\s\S]*?)(?=\n\n|\n[A-Z][a-z]+:|$)/i, /Plan:\s*([\s\S]*?)(?=\n\n|\n[A-Z][a-z]+:|$)/i, /I will\s*([\s\S]*?)(?=\n\n|\n[A-Z][a-z]+:|$)/i, /Objective:\s*([\s\S]*?)(?=\n\n|\n[A-Z][a-z]+:|$)/i];
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        return match[1].trim();
+    const lines = text.split('\n');
+    
+    const goalHeaderPatterns = [/^Goal:\s*(.*)$/i, /^Objective:\s*(.*)$/i, /^Current goal:\s*(.*)$/i, /^Task:\s*(.*)$/i];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      for (const pattern of goalHeaderPatterns) {
+        const match = line.match(pattern);
+        if (match && match[1]) {
+          const content = match[1].trim();
+          const remainingLines: string[] = [content];
+          for (let j = i + 1; j < lines.length; j++) {
+            const nextLine = lines[j].trim();
+            if (!nextLine) continue;
+            if (/^[A-Z][a-z]+:/.test(nextLine)) break;
+            if (/^\d+[\.\)]/.test(nextLine)) break;
+            if (/^[-*•]/.test(nextLine)) break;
+            if (/^(Step|First|Then|Finally|Next|Lately)/i.test(nextLine)) break;
+            if (/^[\[\]]/.test(nextLine)) break;
+            remainingLines.push(nextLine);
+          }
+          return remainingLines.join('\n').trim();
+        }
       }
     }
+    
+    const firstThenMatch = text.match(/I will\s+([\s\S]*?)(?=\n\n|$)/i);
+    if (firstThenMatch && firstThenMatch[1]) return firstThenMatch[1].trim();
+    
     const paragraphs = text.split(/\n\n+/).map(p => p.trim()).filter(p => p.length > 0);
     if (paragraphs.length > 0) return paragraphs[0];
     return null;
   }
 
   private updateGoalStack(text: string) {
-    const patterns = [/(?:Step \d+:)\s*([\s\S]*?)(?=\n\n|\nStep \d+:|$)/gi, /(\d\.\s[\s\S]*?)(?=\n\n|\n\d\.\s|$)/gi, /(?:First,|Then,|Finally,)\s*([\s\S]*?)(?=\n\n|\n(?:First,|Then,|Finally,)|$)/gi];
-    let found = false;
-    for (const pattern of patterns) {
-      const matches = [...text.matchAll(pattern)];
-      if (matches.length > 0) {
-        this.goalStack = matches.map(m => m[1] || m[0]).map(s => s.trim());
-        found = true;
-        break;
+    const lines = text.split('\n');
+    const tasks: string[] = [];
+    let inTaskList = false;
+    let currentTask = "";
+    
+    const stepHeaderPattern = /^(?:Step \d+|Step \d+[:\.]\s*|Steps?:)\s*(.*)$/i;
+    const planHeaderPattern = /^(Plan|Goals|Steps|Tasks):$/i;
+    const numberedPattern = /^(\d+)[\.\)]?\s*(.+)$/;
+    const bulletPattern = /^[-*•]\s+(.*)$/;
+    const keywordPattern = /^(First,|Then,|Next,|Finally,|Lastly,)\s*(.*)$/i;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) {
+        if (currentTask) {
+          tasks.push(currentTask.trim());
+          currentTask = "";
+        }
+        inTaskList = false;
+        continue;
+      }
+      
+      let matched = false;
+      
+      const planMatch = line.match(planHeaderPattern);
+      if (planMatch) {
+        inTaskList = true;
+        matched = true;
+        continue;
+      }
+      
+      const stepMatch = line.match(stepHeaderPattern);
+      if (stepMatch) {
+        if (currentTask) tasks.push(currentTask.trim());
+        currentTask = stepMatch[1];
+        inTaskList = true;
+        matched = true;
+      }
+      
+      if (!matched) {
+        const numMatch = line.match(numberedPattern);
+        if (numMatch) {
+          if (currentTask) tasks.push(currentTask.trim());
+          currentTask = line;
+          inTaskList = true;
+          matched = true;
+        }
+      }
+      
+      if (!matched) {
+        const bullMatch = line.match(bulletPattern);
+        if (bullMatch) {
+          if (currentTask) tasks.push(currentTask.trim());
+          currentTask = bullMatch[1];
+          inTaskList = true;
+          matched = true;
+        }
+      }
+      
+      if (!matched) {
+        const keyMatch = line.match(keywordPattern);
+        if (keyMatch) {
+          if (currentTask) tasks.push(currentTask.trim());
+          currentTask = keyMatch[2];
+          inTaskList = true;
+          matched = true;
+        }
+      }
+      
+      if (!matched && inTaskList && currentTask) {
+        if (/^[A-Z][a-z]+:/.test(line) && !/^(Plan|Goals|Steps|Tasks):/i.test(line)) {
+          tasks.push(currentTask.trim());
+          currentTask = "";
+          inTaskList = false;
+          i--;
+          continue;
+        }
+        if (/^\d+[\.\)]/.test(line)) {
+          tasks.push(currentTask.trim());
+          currentTask = "";
+          continue;
+        }
+        if (/^[-*•]/.test(line)) {
+          tasks.push(currentTask.trim());
+          currentTask = "";
+          continue;
+        }
+        if (/^(First|Then|Finally|Next|Lately)/i.test(line)) {
+          tasks.push(currentTask.trim());
+          currentTask = "";
+          i--;
+          continue;
+        }
+        currentTask += " " + line;
       }
     }
-    if (!found && this.currentSummary) this.goalStack = [this.currentSummary];
+    
+    if (currentTask) tasks.push(currentTask.trim());
+    
+    if (tasks.length > 0) {
+      this.goalStack = tasks.filter(t => t.length > 0);
+    } else if (this.currentSummary && this.currentSummary.length > 0) {
+      this.goalStack = [this.currentSummary];
+    } else {
+      this.goalStack = [];
+    }
   }
 
   private extractConcepts(text: string) {
